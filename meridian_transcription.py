@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 import logging
 
 
-class meridian_transcription:
+class MeridianTranscription:
     
     def __init__(self):
         self.client = OpenAI()
@@ -159,7 +159,7 @@ def main():
 
     # Create transcription agent and text to be used for transcription
     transcribed_text = None
-    agent = meridian_transcription()
+    agent = MeridianModel()
 
     if args.transcription_audio:
             # Check if the file exists
