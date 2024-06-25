@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import messagebox, filedialog
 from meridian_model import MeridianModel
 
-class meridian_gui(tk.Tk):
+class MeridianGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Meridian GUI")
@@ -39,5 +39,5 @@ class meridian_gui(tk.Tk):
     
 
 if __name__ == "__main__":
-    app = meridian_gui()
+    app = MeridianGUI()
     
