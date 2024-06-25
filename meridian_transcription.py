@@ -9,6 +9,7 @@ import argparse
 from dotenv import load_dotenv
 import logging
 
+
 class meridian_transcription:
     
     def __init__(self):
@@ -32,7 +33,7 @@ class meridian_transcription:
                 '-f', 'segment',               # Use the segment muxer
                 '-segment_time', str(segment_time),  # Duration of each segment
                 '-c', 'copy',                  # Copy the streams without re-encoding
-                f'output_segment_%03d.{output_format}'  # Output file pattern
+                f'{input_file}_%03d.{output_format}'  # Output file pattern
             ]
             
             # Execute the command
@@ -41,7 +42,7 @@ class meridian_transcription:
         split_m4a(file_path, 500)
 
         # Find a list of files that start with the name "output_segment" in the current directory
-        output_files = [file for file in os.listdir() if file.startswith("output_segment")]
+        output_files = [file for file in os.listdir() if file.startswith("{input_file}_") and file.endswith(".m4a")]
             
         # Transcribe each chunk individually
         transcriptions = []
@@ -79,41 +80,75 @@ class meridian_transcription:
             
         print("Submitting text for summary:\n", transcription)
 
-        prompt = "Summarize the following text: \n\n" + transcription + "\n\n"
-        prompt+= "There may be multiple speakers - one of whome is the Game Master of the transcript, which comes from a Dungeons and Dragons session. When possible, try to summarize each character's actions. \n\n"
-        prompt+= "Summarize the session in a way that is easy to understand and captures the essence of the session."
+        role = "You are an assistant helping to summarize the events of a Dungeons and Dragons session"
+        role += "There may be multiple speakers - one of whome is the Game Master of the transcript. When possible, try to summarize each character's actions."
+        role+= "Summarize the session in a way that is easy to understand and captures the essence of the session."
         
+        # Analyze the transcription string and break it into a list of strings that are 128,000 tokens
+        transcription_list = []
+        max_tokens = 128000
+        num_tokens = 0
+        current_string = ""
+
+        print(f"Found {len(transcription.split())} tokens in the transcription.")
+        for word in transcription.split():
+            num_tokens += len(word.split())
+            if num_tokens <= max_tokens:
+                current_string += word + " "
+            else:
+                transcription_list.append(current_string.strip())
+                current_string = word + " "
+                num_tokens = len(word.split())
+
+        # Add the last string to the list
+        if current_string:
+            transcription_list.append(current_string.strip())
+            
+        print("Number of segments: ", len(transcription_list))
         # Submit a request to OpenAI's service for summarization
         summary = None
-        try:
-            summary = self.client.chat.completions.create(
-                model="gpt-4-turbo",
-                messages=[
-                    {"role": "system", "content" :"You are an assistant helping to summarize the events of a Dungeons and Dragons session"},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            if summary['choices'][0]['message']['role'] == 'assistant':
-                print("Got response:\n", summary)
-            else:
-                logging.info("Error: Summary request failed.")
-                #sys.exit(2)
-                
-        except APIError as e:
-            logging.info("APIError: Summary request failed.")
-            logging.info(e)
-            sys.exit(2)
-        except Exception as e:
-            logging.info(e)
-            sys.exit(2)
-            
-        return summary['choices'][0]['message']['content']
+        output_string = ""
+
+        for i in range(len(transcription_list)):
+            print(f"Calling OpenAI API for summary of transcription segment {i}")
+            try:
+                summary = self.client.chat.completions.create(
+                    model="gpt-4-turbo",
+                    messages=[
+                        {"role": "system", "content" :role},
+                        {"role": "user", "content": transcription_list[i]}
+                    ]
+                )
+                print(f"Summary response: {summary}")
+                if summary.choices[0].message.role == 'assistant':
+                    print("Response for chunk ", i, ":", summary.choices[0].message.content  )
+                    output_string += summary.choices[0].message.content + " "
+                else:
+                    logging.error("Error: Summary request failed.")
+                    sys.exit(2)
+                    
+            except APIError as e:
+                logging.error("APIError: Summary request failed.")
+                logging.error(e)
+                sys.exit(2)
+            except Exception as e:
+                logging.error(e)
+                sys.exit(2)
+            print(f"Done with summarization of segment {i}")
+
+        return output_string
 
 
 def main():
+    
     # Create an argument parser
     parser = argparse.ArgumentParser(description='Transcribe audio file.')
-
+    
+    # Configure the logging package
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[
+        logging.FileHandler('log.txt'),
+        logging.StreamHandler()
+    ])
     # Add the filename argument
     parser.add_argument('--transcription_audio', type=str, help='Path to the audio file')
     parser.add_argument('--transcription_text', type=str, help='Path to the text file of a previously processed session')
@@ -129,7 +164,7 @@ def main():
     if args.transcription_audio:
             # Check if the file exists
         if not os.path.isfile(args.transcription_audio):
-            logging.info("Error: File does not exist.")
+            logging.error("Error: File does not exist.")
             sys.exit(1)
  
         # Call the transcribe_audio function
@@ -137,7 +172,7 @@ def main():
         
         # Check if transcription is None
         if transcribed_text is None:
-            logging.info("Error: Text could not be transcribed.")
+            logging.error("Error: Text could not be transcribed.")
             sys.exit(1)
 
         # Output the transcription to a text file
@@ -151,10 +186,11 @@ def main():
             with open(args.transcription_text, 'r') as f:
                 transcribed_text = f.read()
         except Exception as e:
-            logging.info(e)
+            logging.error(e)
             sys.exit(1)
             
     else:
+        parser.print_help()
         logging.error("No transcription file or audio file provided - exiting.")
         sys.exit(2)
 
