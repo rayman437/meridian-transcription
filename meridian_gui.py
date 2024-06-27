@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from PIL import Image, ImageTk
 import os
 import random
+import logging 
 
 class MeridianGUI(tk.Tk):
     def __init__(self):
@@ -92,13 +93,57 @@ class MeridianGUI(tk.Tk):
 
     def transcribe_session(self):
         # Code to be executed when "Transcribe Session" button is pressed
+        transcription = None
 
         file_path = filedialog.askopenfilename(filetypes=(('Audio Files', '*.flac;*.m4a;*.mp3;*.mp4;*.mpeg;*.mpga;*.oga;*.ogg;*.wav;*.webm'), ('All Files', '*.*')))
         if file_path:
-            self.model.transcribe_session(file_path)
+            transcription = self.model.transcribe_session(file_path)
         else:
             messagebox.showinfo("Invalid File", "Please select a valid file.")
             
+        if transcription is None:
+            messagebox.showerror("Transcription Error", f"Failed to transcribe file: {file_path}")
+            
+        if transcription is not None:
+            # Create a new window
+            transcription_window = tk.Toplevel(self)
+            transcription_window.title("Transcription")
+            transcription_window.geometry("500x500")
+
+            # Create a frame inside the window
+            frame = tk.Frame(transcription_window)
+            frame.pack(fill=tk.BOTH, expand=True)
+
+            # Create a textbox inside the frame
+            textbox = tk.Text(frame)
+            textbox.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+            
+            def save_transcription():
+                self.model.save_session(textbox.get("1.0", tk.END))
+            
+            def write_transcription():
+                file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
+                if file_path:
+                    with open(file_path, 'w') as file:
+                        transcription = textbox.get("1.0", tk.END)
+                        file.write(transcription)
+            
+            save_button = tk.Button(frame, text="Save", command=lambda: save_transcription)
+            save_button.pack(side=tk.LEFT, padx=10, pady=10)
+            
+            write_button = tk.Button(frame, text="Write to file", command=lambda: write_transcription)
+            write_button.pack(side=tk.LEFT, padx=10, pady=10)
+
+            exit_button = tk.Button(frame, text="Exit", command= lambda: transcription_window.destroy())
+            exit_button.pack(side=tk.LEFT, padx=10, pady=10)
+
+            # Insert the transcription into the textbox
+            textbox.insert(tk.END, transcription)
+
+            # Make the window resizable
+            transcription_window.resizable(True, True)
+        else:
+            messagebox.showinfo("Transcription Error", "No transcription available.")
     def save_session(self):
         # Code to be executed when "Save" button is pressed
         
@@ -237,5 +282,11 @@ class MeridianGUI(tk.Tk):
         
 if __name__ == "__main__":
     load_dotenv()
+     
+    # Configure the logging package
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[
+        logging.FileHandler('log.txt'),
+        logging.StreamHandler()
+    ])
     app = MeridianGUI()
     

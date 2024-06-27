@@ -22,12 +22,11 @@ class MeridianModel:
     def transcribe_session(self, file_path:str) -> str:
         # Implement the summarize_session function here
         if os.path.exists(file_path):
-            with open(file_path, 'r') as file:
-                contents = file.read()
-                result = self.agent.transcribe_audio(contents)
-            return result
+            result = self.agent.transcribe_audio(file_path)
         else:
-            return "File does not exist"
+            result = None
+            
+        return result
         
     def save_session(self, filename) -> None:
         

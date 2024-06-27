@@ -3,11 +3,14 @@
 import os
 import sys
 from openai import OpenAI, APIError
-from pydub import AudioSegment
 import subprocess
 import argparse
 from dotenv import load_dotenv
 import logging
+import threading
+import tkinter as tk
+import threading
+import threading
 
 
 class MeridianTranscription:
@@ -19,57 +22,106 @@ class MeridianTranscription:
         
         # Check the file type
         file_extension = os.path.splitext(file_path)[1].lower()
+        base_name = os.path.basename(file_path).split('.')[0]
         logging.info("file_extension: %s", file_extension)
         supported_extensions = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm']
         if file_extension[1:] not in supported_extensions:
             logging.info("Error: Unsupported audio file type.")
             sys.exit(1)
+        else:
+            logging.info(f"File {file_path} has a supported audio file type. Continuing...")
         
         def split_m4a(input_file, segment_time, output_format='m4a'):
             # Construct the ffmpeg command to split the file
+            
+            file_name = os.path.splitext(input_file)[0].lower()
+            
             command = [
                 'ffmpeg',
                 '-i', input_file,              # Input file
                 '-f', 'segment',               # Use the segment muxer
                 '-segment_time', str(segment_time),  # Duration of each segment
                 '-c', 'copy',                  # Copy the streams without re-encoding
-                f'{input_file}_%03d.{output_format}'  # Output file pattern
+                f'{file_name}_%03d.{output_format}'  # Output file pattern
             ]
             
+            logging.info("Running ffmpeg command: %s", command)
             # Execute the command
             subprocess.run(command, check=True)
             
         split_m4a(file_path, 500)
+        
+        # Extract the directory from file_path
+        directory = os.path.dirname(file_path)
 
         # Find a list of files that start with the name "output_segment" in the current directory
-        output_files = [file for file in os.listdir() if file.startswith("{input_file}_") and file.endswith(".m4a")]
+        logging.info("Looking for files starting with %s in the current directory", base_name)
+        logging.info("Files in the directory: %s", os.listdir(directory))
+        output_files = [file for file in os.listdir(directory) if file.startswith(base_name.lower()) and file.endswith(".m4a")]
+        logging.info("Output files: %s", output_files)
             
         # Transcribe each chunk individually
         transcriptions = []
         
+        # Create a list to hold the threads
+        threads = []
+
+        # Create a semaphore to protect the logging.info call
+        logging_semaphore = threading.Semaphore()
+
         for i, file in enumerate(output_files):
             try:
-                transcription = self.client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=open(file, 'rb'),
-                    response_format="text"
-                )
-                logging.info("Finished with segment %d", i+1)
+                logging_semaphore.acquire()  # Acquire the semaphore before logging
+                logging.info("Processing segment %d", i)
+                logging_semaphore.release()  # Release the semaphore after logging
                 
-                logging.info("Response: %s", transcription)
-                with open(f"{file}_{i}_transcription.txt", "w") as f:
-                    # Write the transcription to the file
-                    f.write(transcription)
+                # Define the function to be executed in the thread
+                def process_segment(file, i):
+                    transcription = self.client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=open(f"{directory}/{file}", 'rb'),
+                        response_format="text",
+                        language="en"
+                        #prompt="Generate a transcript of the audio file and return a response in English."
+                    )
+                    logging_semaphore.acquire()  # Acquire the semaphore before logging
+                    logging.info("Finished with segment %d", i)
+                    logging.info("Response: %s", transcription)
+                    logging_semaphore.release()  # Release the semaphore after logging
 
-                transcriptions.append(transcription)
+                    # Append the transcription to the list in a thread-safe way
+                    with threading.Lock():
+                        transcriptions.append((i, transcription))
+                                    
+                # Create a new thread for each iteration
+                thread = threading.Thread(target=process_segment, args=(file, i))
+                threads.append(thread)
+                
+                # Start the thread
+                thread.start()
+                
             except APIError as e:
-                logging.info("APIError: Transcription request for chunk %d failed.", i+1)
-                logging.info(e)
-            except Exception as e:
-                logging.info(e)
+                logging_semaphore.acquire()  # Acquire the semaphore before logging
+                logging.error("APIError: Transcription request for chunk %d failed.", i+1)
+                logging.error(e)
+                logging_semaphore.release()  # Release the semaphore after logging
 
-        # Combine the transcriptions
-        transcribed_text = ' '.join(transcriptions)
+            except Exception as e:
+                logging_semaphore.acquire()  # Acquire the semaphore before logging
+                logging.error(e)
+                logging_semaphore.release()  # Release the semaphore after logging
+
+
+        # Wait for all threads to complete
+        for thread in threads:
+            thread.join()
+
+        sorted_transcriptions = sorted(transcriptions, key=lambda x: x[0])
+        sorted_transcriptions = [t[1] for t in sorted_transcriptions]
+        logging.info("Transcriptions: %s", sorted_transcriptions)
+
+        # Combine the transcriptions and sort them
+        transcribed_text = ' '.join(t[1] for t in sorted_transcriptions)
 
         return transcribed_text
 
@@ -78,7 +130,7 @@ class MeridianTranscription:
         if isinstance(transcription, list):
             transcription = ' '.join(transcription)
             
-        print("Submitting text for summary:\n", transcription)
+        logging.info("Submitting text for summary:\n", transcription)
 
         role = "You are an assistant helping to summarize the events of a Dungeons and Dragons session"
         role += "There may be multiple speakers - one of whome is the Game Master of the transcript. When possible, try to summarize each character's actions."
@@ -90,7 +142,7 @@ class MeridianTranscription:
         num_tokens = 0
         current_string = ""
 
-        print(f"Found {len(transcription.split())} tokens in the transcription.")
+        logging.info(f"Found {len(transcription.split())} tokens in the transcription.")
         for word in transcription.split():
             num_tokens += len(word.split())
             if num_tokens <= max_tokens:
@@ -104,7 +156,7 @@ class MeridianTranscription:
         if current_string:
             transcription_list.append(current_string.strip())
             
-        print("Number of segments: ", len(transcription_list))
+        logging.info("Number of segments: ", len(transcription_list))
         # Submit a request to OpenAI's service for summarization
         summary = None
         output_string = ""
@@ -159,7 +211,7 @@ def main():
 
     # Create transcription agent and text to be used for transcription
     transcribed_text = None
-    agent = MeridianModel()
+    agent = MeridianTranscription()
 
     if args.transcription_audio:
             # Check if the file exists
