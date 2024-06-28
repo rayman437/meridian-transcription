@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 import threading
-from bin.BaseTranscription import BaseTranscription
+from bin.transcription.BaseTranscription import BaseTranscription
 
 class RemoteTranscription(BaseTranscription):
     """
@@ -153,7 +153,7 @@ class RemoteTranscription(BaseTranscription):
 
         return transcribed_text
 
-    def summarize_audio(self, transcription) -> str:
+    def summarize_text(self, transcription) -> str:
         """
         Summarizes the transcription of a session.
 

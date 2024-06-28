@@ -24,7 +24,7 @@ class BaseTranscription:
         """
         pass
 
-    def summarize_audio(self, transcription) -> str:
+    def summarize_text(self, transcription) -> str:
         """
         Summarizes the transcription of a session.
 

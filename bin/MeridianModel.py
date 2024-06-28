@@ -1,6 +1,5 @@
-from bin.LocalTranscription import LocalTranscription
-from bin.RemoteTranscription import RemoteTranscription
-
+from bin.transcription.LocalTranscription import LocalTranscription
+from bin.transcription.RemoteTranscription import RemoteTranscription
 
 class MeridianModel:
 
@@ -22,7 +21,7 @@ class MeridianModel:
 
         with open(file_path, 'r') as file:
             contents = file.read()
-            result = self.agent.summarize_audio(contents)
+            result = self.agent.summarize_text(contents)
         return result
 
 
