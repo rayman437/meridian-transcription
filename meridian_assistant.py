@@ -5,12 +5,11 @@ import sys
 import argparse
 from dotenv import load_dotenv
 import logging
-import tkinter as tk
+import time
 
 from bin.transcription.LocalTranscription import LocalTranscription
 from bin.transcription.RemoteTranscription import RemoteTranscription
-from bin.MeridianGui import MeridianGUI
-import time
+from bin.MeridianGUI import MeridianGUI
 
 def main():
 

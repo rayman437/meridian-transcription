@@ -61,6 +61,9 @@ class MeridianGUI(tk.Tk):
 
         view_data_button = tk.Button(button_frame, text="View Data", command=self.view_data)
         view_data_button.grid(row=0, column=3, padx=10, pady=10)
+        
+        analyze_button = tk.Button(button_frame, text="Analyze Session", command=self.analyze_session)
+        analyze_button.grid(row=0, column=6, padx=10, pady=10)
 
         save_button = tk.Button(button_frame, text="Save", command=self.save_session)
         save_button.grid(row=1, column=0, padx=10, pady=10)
@@ -91,6 +94,118 @@ class MeridianGUI(tk.Tk):
         file_path = filedialog.askopenfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
         if file_path:
             self.model.summarize_audio(file_path)
+        else:
+            messagebox.showinfo("Invalid File", "Please select a valid file.")
+            
+    def analyze_session(self):
+        # Code to be executed when "Analyze Session" button is pressed
+        file_path = filedialog.askopenfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
+        if file_path:
+            if os.path.exists(file_path):
+                
+                # Define button functions
+                def load_transcript():
+                    file_path = filedialog.askopenfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
+                    if file_path:
+                        with open(file_path, 'r') as file:
+                            content = file.read()
+                            transcript_textbox.delete("1.0", tk.END)
+                            transcript_textbox.insert(tk.END, content)
+ 
+                def submit_question():
+                    # Code to be executed when "Submit Question" button is pressed
+                    question = query_textbox.get("1.0", tk.END).strip()
+                    if question:
+                        response = self.model.ask_question(question, transcript_textbox.get("1.0", tk.END))
+                        response_textbox.delete("1.0", tk.END)
+                        response_textbox.insert(tk.END, response)
+                    else:
+                        messagebox.showinfo("Invalid Question", "Please enter a valid question.")
+
+                def save_response():
+                    # Code to be executed when "Save Response" button is pressed
+                    file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
+                    if file_path:
+                        with open(file_path, 'w') as file:
+                            file.write(response_textbox.get("1.0", tk.END))
+                    else:
+                        messagebox.showinfo("Invalid File", "Please select a valid file.")
+                
+                # Create a new window
+                analyze_window = tk.Toplevel(self)
+                analyze_window.title("Analyze Session")
+                analyze_window.geometry("500x1200")
+
+                # Create a frame inside the window
+                frame = tk.Frame(analyze_window)
+                frame.pack(fill=tk.BOTH, expand=True)
+                
+                # Create a frame for the transcript textbox and scrollbar
+                transcript_frame = tk.Frame(frame)
+                transcript_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+                
+                # Create a label for Transcript textbox
+                transcript_label = tk.Label(transcript_frame, text="Transcript:")
+                transcript_label.pack(side=tk.TOP, padx=10, pady=10)
+                
+                # Create a textbox for Transcript
+                transcript_textbox = tk.Text(transcript_frame)
+                transcript_textbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+                transcript_scrollbar = tk.Scrollbar(transcript_frame, command=transcript_textbox.yview)
+                transcript_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+                transcript_textbox.config(yscrollcommand=transcript_scrollbar.set)
+
+                # Create a frame for the query textbox and scrollbar
+                query_frame = tk.Frame(frame)
+                query_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+                # Create a label for Query textbox
+                query_label = tk.Label(query_frame, text="Query:")
+                query_label.pack(side=tk.TOP, padx=10, pady=5)
+
+                # Create a textbox for Query
+                query_textbox = tk.Text(query_frame, height=int(transcript_textbox['height']) // 2)
+                query_textbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
+                query_scrollbar = tk.Scrollbar(query_frame, command=query_textbox.yview)
+                query_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+                query_textbox.config(yscrollcommand=query_scrollbar.set)
+
+                # Create a frame for the response textbox and scrollbar
+                response_frame = tk.Frame(frame)
+                response_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+                # Create a label for Response textbox
+                response_label = tk.Label(response_frame, text="Response:")
+                response_label.pack(side=tk.TOP, padx=10, pady=5)
+
+                # Create a textbox for Response
+                response_textbox = tk.Text(response_frame, height=int(transcript_textbox['height']) // 2)
+                response_textbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
+                response_scrollbar = tk.Scrollbar(response_frame, command=response_textbox.yview)
+                response_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+                response_textbox.config(yscrollcommand=response_scrollbar.set)
+
+                # Create a frame for the buttons
+                button_frame = tk.Frame(analyze_window)
+                button_frame.pack(side=tk.BOTTOM, padx=10, pady=10)
+                
+                load_transcript_button = tk.Button(button_frame, text="Load Transcript", command=load_transcript)
+                load_transcript_button.pack(side=tk.LEFT, padx=10)
+
+                submit_question_button = tk.Button(button_frame, text="Submit Question", command=lambda: submit_question)
+                submit_question_button.pack(side=tk.LEFT, padx=10)
+
+                save_response_button = tk.Button(button_frame, text="Save Response", command=lambda: save_response)
+                save_response_button.pack(side=tk.LEFT, padx=10)
+
+                exit_button = tk.Button(button_frame, text="Exit", command=lambda: analyze_window.destroy())
+                exit_button.pack(side=tk.LEFT, padx=10)
+
+                # Make the window resizable
+                analyze_window.pack_slaves()
+                analyze_window.resizable(True, True)
+            else:
+                messagebox.showinfo("Invalid File", "Please select a valid file.")
         else:
             messagebox.showinfo("Invalid File", "Please select a valid file.")
 

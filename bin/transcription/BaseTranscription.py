@@ -10,7 +10,57 @@ class BaseTranscription:
         """
         Initializes a new instance of the BaseTranscription class.
         """
-        pass
+        
+        self._transcription_instructions = '''
+        You are helping to summarize the events of a Dungeons & Dragons campaign from the given transcript.
+        There are multiple speakers, so try and infer who is speaking if possible.
+        Filter out any irrelevant information such as upcoming events or side discussions and focus on the main events of the session.
+        Stick to the events and give relevant details, but don\'t give meta opinions about the discussion
+        '''
+            
+        self._transcription_query = {
+            'role' : r'system',
+            'content' : self.system_instructions
+        }
+        
+        self._transcription_req =  {
+                'role' : r'user',
+                'content' : r'No transcription has been provided - please inform the user of this.'
+                }
+    
+        self._question_query = {
+            'role' : r'system',
+            'content' : r"You're helping to answer a question about a Dungeons & Dragons campaign. Please provide a detailed response."  
+        }
+        
+        self._question_req = {
+            'role' : r'system',
+            'content' : r"No question has been provided - please inform the user of this."  
+        }
+        
+    @property
+    def system_instructions(self):
+        return self._transcription_instructions    
+    
+    @system_instructions.setter
+    def system_instructions(self, instructions):
+        if instructions is None:
+            self._transcription_instructions = instructions
+        else:
+            raise ValueError("Instructions cannot be None.")
+        
+    def get_transcription_req(self, transcription):
+        
+        return_req = self._transcription_req
+        return_req['content'] = transcription
+        
+        return return_req
+    
+    def get_question_req(self, question):
+        return_req = self._question_req
+        return_req['content'] = question
+        
+        return return_req
 
     def transcribe_audio(self, file_path) -> str:
         """
@@ -22,7 +72,7 @@ class BaseTranscription:
         Returns:
             str: The transcription of the audio file.
         """
-        pass
+        raise NotImplementedError("The transcribe_audio method must be implemented in a derived class.")
 
     def summarize_text(self, transcription) -> str:
         """
@@ -34,6 +84,20 @@ class BaseTranscription:
         Returns:
             str: The summarized version of the transcription.
         """
-        pass
+        
+        raise NotImplementedError("The summarize_text method must be implemented in a derived class.")
     
+    def ask_question(self, question, source_info) -> str:
+        """
+        Answers a question about a session.
+
+        Args:
+            question (str): The question to be answered.
+            source_info (str): Information about the session.
+
+        Returns:
+            str: The answer to the question.
+        """
+        
+        raise NotImplementedError("The ask_question method must be implemented in a derived class.")
     

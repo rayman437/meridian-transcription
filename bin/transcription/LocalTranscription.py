@@ -63,7 +63,7 @@ class LocalTranscription(BaseTranscription):
         
         return transcription
 
-    def summarize_text(self, transcription_file) -> str:
+    def summarize_text(self, transcription) -> str:
         """
         Summarizes the transcription of a session.
 
@@ -73,25 +73,22 @@ class LocalTranscription(BaseTranscription):
         Returns:
             str: The summarized version of the transcription.
         """
-        # Add your code here to summarize the transcription
-        transcription = ''
-        
-        with open(transcription_file, 'r') as file:
-            transcription = file.read()
-            
-        system_query = {
-            'role' : 'system',
-            'content' : 'You are helping to summarize the events of a Dungeons & Dragons campaign from the given transcript. There are multiple speakers, so try and infer who is speaking if possible'
-        }
-        
-        transcription_req =  {
-                'role' : 'user',
-                'content' : 'Summarize the following transcription:\n\n ' + transcription
-                }    
-        print("Sending query to ollama for summarization using following message:\n", transcription_req)
+
+        logging.info("Sending query to ollama for summarization using following message:\n", self.get_transcription_req(transcription))
         try:
-            response = ollama.chat(model=self.text_model, messages=[transcription_req])
-            print("Response from ollama: ", response)
+            response = ollama.chat(model=self.text_model, messages=[self._transcription_query, self.get_transcription_req(transcription)])
+            logging.info("Response from ollama: ", response)
+            return response['message']['content']
+        except Exception as e:
+            logging.error(e)
+            return None
+        
+    def ask_question(self, question, source_info) -> str:
+        
+        logging.info("Sending query to ollama for answering question using following message:\n", self.get_question_req(question))
+        try:
+            response = ollama.chat(model=self.text_model, messages=[self._question_query, self.get_question_req(question, source_info)])
+            logging.info("Response from ollama: ", response)
             return response['message']['content']
         except Exception as e:
             logging.error(e)
