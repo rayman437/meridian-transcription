@@ -16,8 +16,8 @@ class LocalTranscription(BaseTranscription):
         It prompts the user to select a whisper model from the available models list and loads the selected model.
         """
         super().__init__()
-        self.audo_model = audio_model
-        self.text_model = text_model
+        self._audio_model = audio_model
+        self._text_model = text_model
         
         if audio_model not in whisper.available_models():
             available_models = whisper.available_models()
@@ -45,7 +45,7 @@ class LocalTranscription(BaseTranscription):
         else:
             selected_model = audio_model
         
-        self.model = whisper.load_model(selected_model, device='cuda')
+        self._whisper_model = whisper.load_model(selected_model, device='cuda')
         
     def transcribe_audio(self, file_path) -> str:
         """
@@ -59,9 +59,9 @@ class LocalTranscription(BaseTranscription):
         """
         # Add your code here to transcribe the audio locally
         audio_data = whisper.load_audio(file_path)
-        transcription = self.model.transcribe(audio_data)
+        transcription = self._whisper_model.transcribe(audio_data)
         
-        return transcription
+        return transcription['text']
 
     def summarize_text(self, transcription) -> str:
         """
@@ -76,7 +76,7 @@ class LocalTranscription(BaseTranscription):
 
         logging.info("Sending query to ollama for summarization using following message:\n", self.get_transcription_req(transcription))
         try:
-            response = ollama.chat(model=self.text_model, messages=[self._transcription_query, self.get_transcription_req(transcription)])
+            response = ollama.chat(model=self._text_model, messages=[self._transcription_query, self.get_transcription_req(transcription)])
             logging.info("Response from ollama: ", response)
             return response['message']['content']
         except Exception as e:
@@ -84,10 +84,10 @@ class LocalTranscription(BaseTranscription):
             return None
         
     def ask_question(self, question, source_info) -> str:
-        
-        logging.info("Sending query to ollama for answering question using following message:\n", self.get_question_req(question))
+        messages = [self._question_query, self.get_question_req(question, source_info)]
+        logging.info(f"Sending query to ollama for answering question using following messages:\n{messages}")
         try:
-            response = ollama.chat(model=self.text_model, messages=[self._question_query, self.get_question_req(question, source_info)])
+            response = ollama.chat(model=self._text_model, messages=messages)
             logging.info("Response from ollama: ", response)
             return response['message']['content']
         except Exception as e:

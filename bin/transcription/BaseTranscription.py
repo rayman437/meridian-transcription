@@ -34,7 +34,7 @@ class BaseTranscription:
         }
         
         self._question_req = {
-            'role' : r'system',
+            'role' : r'user',
             'content' : r"No question has been provided - please inform the user of this."  
         }
         
@@ -56,11 +56,12 @@ class BaseTranscription:
         
         return return_req
     
-    def get_question_req(self, question):
+    def get_question_req(self, question, context):
         return_req = self._question_req
-        return_req['content'] = question
+        return_req['content'] = f"The data to analyze is below:\n{context}\n\n The question is:\n{question}"
         
         return return_req
+    
 
     def transcribe_audio(self, file_path) -> str:
         """
