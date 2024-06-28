@@ -6,7 +6,7 @@ class LocalTranscription(BaseTranscription):
     Class for local audio transcription.
     """
 
-    def __init__(self):
+    def __init__(self, model = 'small.en'):
         """
         Initializes a new instance of the LocalTranscription class.
         
@@ -15,28 +15,31 @@ class LocalTranscription(BaseTranscription):
         """
         super().__init__()
         
-        available_models = whisper.available_models()
-        selected_model = ""
+        if model not in whisper.available_models():
+            available_models = whisper.available_models()
+            selected_model = ""
 
-        # Ask the user to select models from the available models list
-        print("Available models:")
-        for i, model in enumerate(available_models):
-            print(f"{i+1}. {model}")
+            # Ask the user to select models from the available models list
+            print("Available models:")
+            for i, model in enumerate(available_models):
+                print(f"{i+1}. {model}")
 
-        while True:
-            model_index = input("Select a model (enter the corresponding number) or press 'q' to quit: ")
-            if model_index == 'q':
-                break
-            try:
-                model_index = int(model_index)
-                if 1 <= model_index <= len(available_models):
-                    selected_model = available_models[model_index-1]
-                    print(f"Selected model: {selected_model}")
+            while True:
+                model_index = input("Select a model (enter the corresponding number) or press 'q' to quit: ")
+                if model_index == 'q':
                     break
-                else:
-                    print("Invalid model index. Please try again.")
-            except ValueError:
-                print("Invalid input. Please try again.")
+                try:
+                    model_index = int(model_index)
+                    if 1 <= model_index <= len(available_models):
+                        selected_model = available_models[model_index-1]
+                        print(f"Selected model: {selected_model}")
+                        break
+                    else:
+                        print("Invalid model index. Please try again.")
+                except ValueError:
+                    print("Invalid input. Please try again.")
+        else:
+            selected_model = model
         
         self.model = whisper.load_model(selected_model, device='cuda')
         

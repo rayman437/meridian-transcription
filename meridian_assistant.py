@@ -26,6 +26,8 @@ def main():
     # Add the filename argument
     parser.add_argument('--transcription_audio', type=str, help='Path to the audio file')
     parser.add_argument('--transcription_text', type=str, help='Path to the text file of a previously processed session')
+    parser.add_argument('--local', action='store_true', help='Use local transcription service')
+    parser.add_argument('--remote', action='store_true', help='Use remote transcription service')
     parser.add_argument('--summarize_text', action='store_true', help='Summarize the transcribed text')
     parser.add_argument("--gui", action="store_true", help="Launch the GUI")
 
@@ -46,13 +48,20 @@ def main():
             logging.error("Error: File does not exist.")
             sys.exit(1)
             
-        transcription_service = input("Choose transcription service (Local/Remote): ")
-        if transcription_service.lower() == "local":
+        transcription_service = ""
+        
+        if not args.local and not args.remote:    
+            transcription_service = input("Choose transcription service (Local/Remote): ")
+            if transcription_service.lower() == "local":
+                agent = LocalTranscription()
+            elif transcription_service.lower() == "remote":
+                agent = RemoteTranscription()
+            else:
+                print("Invalid transcription service choice. Defaulting to Remote.")
+                agent = RemoteTranscription()
+        elif args.local:
             agent = LocalTranscription()
-        elif transcription_service.lower() == "remote":
-            agent = RemoteTranscription()
-        else:
-            print("Invalid transcription service choice. Defaulting to Remote.")
+        elif args.remote:
             agent = RemoteTranscription()
  
         # Call the transcribe_audio function
@@ -61,7 +70,9 @@ def main():
         end_time = time.time()
 
         execution_time = end_time - start_time
-        print(f"Transcription completed in {execution_time} seconds.")
+        print(f"Transcription completed in {str(execution_time)} seconds.")
+        
+        print("Transcribed text:\n\n" , transcribed_text)
         
         # Check if transcription is None
         if transcribed_text is None:
@@ -70,7 +81,7 @@ def main():
 
         # Output the transcription to a text file
         with open('transcription.txt', 'w') as text_file:
-            text_file.write(transcribed_text)
+            text_file.write(transcribed_text['text'])
             
     elif args.transcription_text :
         
