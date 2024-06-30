@@ -1,6 +1,6 @@
 # Meridian Assistant
 
-Meridian Assistant is a versatile tool designed for transcribing audio files and summarizing texts. It can operate in both local and remote modes, and it offers a graphical user interface (GUI) for ease of use.
+Meridian Assistant is a versatile tool designed for transcribing audio files and summarizing texts for Dungeons & Dragons sessions. It can operate in both local and remote modes (if given a valid OpenAI API key), and it offers a graphical user interface (GUI) for ease of use.
 
 ## Features
 
@@ -14,6 +14,8 @@ Meridian Assistant is a versatile tool designed for transcribing audio files and
 Before you start using Meridian Assistant, ensure you have Python installed on your system. Additionally, you need to install the required dependencies by running:
 
 pip install -r requirements.txt
+
+It's also required to have ollama and whisper installed - please consult those project's instructions for details
 
 
 ## Usage

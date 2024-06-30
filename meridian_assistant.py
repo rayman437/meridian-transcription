@@ -9,7 +9,7 @@ import time
 
 from bin.transcription.LocalTranscription import LocalTranscription
 from bin.transcription.RemoteTranscription import RemoteTranscription
-from bin.MeridianGUI import MeridianGUI
+from bin.gui.MeridianGUI import MeridianGUI
 
 def main():
 
@@ -108,8 +108,17 @@ if __name__ == '__main__':
     load_dotenv()
     
     # Configure the logging package
+    current_time = time.strftime("%Y%m%d-%H%M%S")
+    log_filename = f"log_{current_time}.txt"
+    debug_filename = f"debug_{current_time}.txt"
+    
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[
-        logging.FileHandler('log.txt'),
+        logging.FileHandler(log_filename),
+        logging.StreamHandler(sys.stdout)
+    ])
+    
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[
+        logging.FileHandler(debug_filename),
         logging.StreamHandler(sys.stdout)
     ])
     logging.debug("API Key: %s", os.getenv('OPENAI_API_KEY'))

@@ -2,6 +2,7 @@ import logging
 from bin.transcription.BaseTranscription import BaseTranscription
 import whisper
 import ollama
+import json
 
 class LocalTranscription(BaseTranscription):
     """
@@ -59,7 +60,9 @@ class LocalTranscription(BaseTranscription):
         """
         # Add your code here to transcribe the audio locally
         audio_data = whisper.load_audio(file_path)
-        transcription = self._whisper_model.transcribe(audio_data)
+        transcription = self._whisper_model.transcribe(
+            audio_data,
+            initial_prompt="The audio has multiple speakers - when possible, try to clearly mark when different speakers are talking. ")
         
         return transcription['text']
 
@@ -84,13 +87,42 @@ class LocalTranscription(BaseTranscription):
             return None
         
     def ask_question(self, question, source_info) -> str:
-        messages = [self._question_query, self.get_question_req(question, source_info)]
-        logging.info(f"Sending query to ollama for answering question using following messages:\n{messages}")
+        answer = ""
+        if self.chat_responses is None:
+            logging.info("Chat responses cleared - reinitializing with contents of transcription window.")
+            self.chat_responses = [{"role" : "assistant", 
+                                "content" : "You're helping to answer a question about a Dungeons & Dragons campaign."},
+                                {"role" : "system",
+                                "content" : f'''Please provide a detailed response based on the information in this transcript
+                                
+{source_info} 
+                                
+                                             
+Any responses that you give should be based on the information in the transcript and the conversation with the user. If you need more information, please ask for it.'''}]
+        
+        self.chat_responses.append({"role" : "user", "content" : question})
+        
+        logging.debug(f"Query:\n\n {question}")
+        logging.debug(f"Current responses:\n\n {self.chat_responses}")
+        
         try:
-            response = ollama.chat(model=self._text_model, messages=messages)
-            logging.info("Response from ollama: ", response)
-            return response['message']['content']
+            logging.info(f"Attempting to send query to ollama for question analysis: {question}")
+            responses = ollama.chat(
+                messages=self.chat_responses,
+                model=self._text_model,
+                stream = True,
+                temperature = 0.5)
+            for response in responses:
+                if not response['done']:
+                    self.chat_responses.append({"role": "assistant",
+                                                "content": response['message']['content']})
+                    answer+=response['message']['content']
+                else:
+                    break
+            logging.info(f"Response from ollama: {answer}")
+            return answer
+        
         except Exception as e:
             logging.error(e)
-            return None
-  
+            return "Query failed - please try again."
+    

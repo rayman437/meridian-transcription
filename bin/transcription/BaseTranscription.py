@@ -1,4 +1,4 @@
-
+import logging
 
 class BaseTranscription:
     
@@ -38,6 +38,8 @@ class BaseTranscription:
             'content' : r"No question has been provided - please inform the user of this."  
         }
         
+        self.chat_responses = None
+        
     @property
     def system_instructions(self):
         return self._transcription_instructions    
@@ -56,12 +58,11 @@ class BaseTranscription:
         
         return return_req
     
-    def get_question_req(self, question, context):
-        return_req = self._question_req
-        return_req['content'] = f"The data to analyze is below:\n{context}\n\n The question is:\n{question}"
+    def get_question_req(self, question, context) -> str:
+        logging.info("Creating question for analysis", question, context)
         
-        return return_req
-    
+        return f"The data to analyze is below:\n{context}\n\n The question is:\n{question}"
+        
 
     def transcribe_audio(self, file_path) -> str:
         """
@@ -102,3 +103,8 @@ class BaseTranscription:
         
         raise NotImplementedError("The ask_question method must be implemented in a derived class.")
     
+    def clear_chat_responses(self):
+        
+        logging.info("Clearing chat responses...")
+        logging.debug(f"Chat responses before clearing:\n\n {self.chat_responses}")
+        self.chat_responses = None
