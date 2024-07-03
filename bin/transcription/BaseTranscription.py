@@ -17,16 +17,17 @@ class BaseTranscription:
         Filter out any irrelevant information such as upcoming events or side discussions and focus on the main events of the session.
         Stick to the events and give relevant details, but don\'t give meta opinions about the discussion
         '''
+        self._system_instructions = ""
             
         self._transcription_query = {
             'role' : r'system',
-            'content' : self.system_instructions
+            'content' : self._transcription_instructions
         }
         
         self._transcription_req =  {
-                'role' : r'user',
-                'content' : r'No transcription has been provided - please inform the user of this.'
-                }
+            'role' : r'user',
+            'content' : r'No transcription has been provided - please inform the user of this.'
+        }
     
         self._question_query = {
             'role' : r'system',

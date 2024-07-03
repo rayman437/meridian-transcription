@@ -109,15 +109,21 @@ class MeridianGUI(tk.Tk):
     def summarize_session(self):
         # Code to be executed when "Summarize Session" button is pressed
         file_path = filedialog.askopenfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
+        summary = None
         if file_path:
             try:
-                self.model.summarize_audio(file_path)
+                summary = self.model.summarize_audio(file_path)
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred: {e}")
                 logging.error(e)
                 return
         else:
             messagebox.showinfo("Invalid File", "Please select a valid file.")
+            
+        if summary is not None:
+            messagebox.showinfo("Summary", summary)
+        else:
+            messagebox.showinfo("No Summary", "A problem occured - no summary was generated.")
             
     def analyze_session(self):
         # Create a new window
@@ -134,11 +140,11 @@ class MeridianGUI(tk.Tk):
                     content = file.read()
                     transcript_textbox.delete("1.0", tk.END)
                     transcript_textbox.insert(tk.END, content)
-            print("load_transcript function called")
+            logging.info(f"load_transcript function called for file {file_path}")
 
         def submit_question():
             # Code to be executed when "Submit Question" button is pressed
-            print("submit_question function called")
+            logging.info("submit_question function called")
             submit_question_button.config(state=tk.DISABLED)
             try:
                 question = query_textbox.get("1.0", tk.END).strip()
@@ -153,7 +159,7 @@ class MeridianGUI(tk.Tk):
                 logging.error(e)
                 
             submit_question_button.config(state=tk.NORMAL)
-            print("submit_question function exit")
+            logging.info("submit_question function exit")
 
         def save_response():
             # Code to be executed when "Save Response" button is pressed
@@ -163,7 +169,7 @@ class MeridianGUI(tk.Tk):
                     file.write(response_textbox.get("1.0", tk.END))
             else:
                 messagebox.showinfo("Invalid File", "Please select a valid file.")
-            print("save_response function called")
+            logging.info("save_response function called")
         
         def load_query():
             file_path = filedialog.askopenfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')), parent=analyze_window)
@@ -172,7 +178,7 @@ class MeridianGUI(tk.Tk):
                     content = file.read()
                     query_textbox.delete("1.0", tk.END)
                     query_textbox.insert(tk.END, content)
-            print("load_query function called")
+            logging.info("load_query function called")
 
         def save_query():
             file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
@@ -181,7 +187,7 @@ class MeridianGUI(tk.Tk):
                     file.write(query_textbox.get("1.0", tk.END))
             else:
                 messagebox.showinfo("Invalid File", "Please select a valid file.")
-            print("save_query function called")
+            logging.info("save_query function called")
         
         def clear_conversation():
             logging.info("Clearing conversation")
@@ -291,12 +297,11 @@ class MeridianGUI(tk.Tk):
         self.buttons["transcribe_button"].config(state=tk.DISABLED)
 
         # Create a new window
+        transcription_title = "Ready to transcribe"
         transcription_window = tk.Toplevel(self)
-        transcription_window.title("Transcription")
+        transcription_window.title(transcription_title)
         transcription_window.geometry("500x500")
         
-        self.set_topmost(transcription_window, True)
-
         # Create a frame inside the window
         frame = tk.Frame(transcription_window)
         frame.pack(fill=tk.BOTH, expand=True)
@@ -325,10 +330,10 @@ class MeridianGUI(tk.Tk):
                 file_path = filedialog.askopenfilename(filetypes=(('Audio Files', '*.flac;*.m4a;*.mp3;*.mp4;*.mpeg;*.mpga;*.oga;*.ogg;*.wav;*.webm'), ('All Files', '*.*')), parent=transcription_window)
                 if file_path:
                     try:
-
                         # Display an info message warning that transcription will take a while
-                        messagebox.showinfo("Transcription", "Transcription may take a while - this is normal. Please wait.")
-
+                        transcription_window.title("Transcribing.....")
+                        messagebox.showinfo("Transcription", "Program may hang while transcription is going on - this is normal. Please be patient...")
+                        textbox.delete("1.0", tk.END)
                         start_time = time.time()
                         transcription = self.model.transcribe_audio(file_path)
                         end_time = time.time()
@@ -338,19 +343,18 @@ class MeridianGUI(tk.Tk):
 
                         # Display a notification with the transcription duration
                         messagebox.showinfo("Transcription", f"Transcription completed in {duration} seconds.")
+                        transcription_window.title(transcription_title)
+                        textbox.insert(tk.END, transcription)
 
-                        textbox.delete("1.0", tk.END)
-                        textbox.insert(tk.END, transcription)
-                        textbox.delete("1.0", tk.END)
-                        textbox.insert(tk.END, transcription)
-                        
+                        break
                     except Exception as e:
                         messagebox.showerror("Transcription Error", f"An error occurred: {e}")
                         logging.error(e)
         
                 if transcription is None:
-                    answer = messagebox.askyesno("Transcription Error", f"Could not do transcription for {file_path}. Try again?")
-                    if answer == 'no':
+                    answer = messagebox.askretrycancel("Transcription Error", f"Could not do transcription for {file_path}. Try again?")
+                    logging.info(f"Failed transcription: user response = {answer}")
+                    if answer == 'cancel':
                         break
                 
         transcription_button = tk.Button(frame, text="Transcribe Audio", command= do_transcription)
