@@ -31,10 +31,10 @@ class MeridianModel:
         return result
 
 
-    def transcribe_audio(self, file_path:str) -> str:
+    def transcribe_audio(self, file_path:str, num_speakers: int) -> str:
         # Implement the summarize_session function here
         if os.path.exists(file_path):
-            result = self.agent.transcribe_audio(file_path)
+            result = self.agent.transcribe_audio_v2(file_path, num_speakers)
         else:
             result = None
 

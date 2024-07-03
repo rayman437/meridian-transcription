@@ -22,7 +22,7 @@ def main():
     parser.add_argument('--remote', action='store_true', help='Use remote transcription service')
     parser.add_argument('--summarize_text', type=str, help='Summarize the text in the given file')
     parser.add_argument('--output_file', type=str, help='Path to the output file')
-    parser.add_argument("--gui", action="store_true", help="Launch the GUI")
+    parser.add_argument("--gui", action="store_true", help="Don't launch the GUI", default=True)
 
     # Parse the arguments
     args = parser.parse_args()
@@ -108,9 +108,9 @@ if __name__ == '__main__':
     load_dotenv()
     
     # Configure the logging package
-    current_time = time.strftime("%Y%m%d-%H%M%S")
-    log_filename = f"log_{current_time}.txt"
-    debug_filename = f"debug_{current_time}.txt"
+    #current_time = time.strftime("%Y%m%d-%H%M%S")
+    log_filename = "log.txt"
+    debug_filename = "debug.txt"
     
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[
         logging.FileHandler(log_filename),
@@ -119,7 +119,6 @@ if __name__ == '__main__':
     
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[
         logging.FileHandler(debug_filename),
-        logging.StreamHandler(sys.stdout)
     ])
     logging.debug("API Key: %s", os.getenv('OPENAI_API_KEY'))
     

@@ -1,6 +1,7 @@
 import logging
 import time
-import whisper
+import whisperx as whisper
+import gc
 import ollama
 import json
 import torch
@@ -17,7 +18,7 @@ class LocalTranscription(BaseTranscription):
     Class for local audio transcription.
     """
 
-    def __init__(self, audio_model = 'small.en', text_model = 'llama3'):
+    def __init__(self, audio_model = 'medium.en', text_model = 'llama3', device = 'cuda', batch_size = 16):
         """
         Initializes a new instance of the LocalTranscription class.
         
@@ -25,6 +26,8 @@ class LocalTranscription(BaseTranscription):
         It prompts the user to select a whisper model from the available models list and loads the selected model.
         """
         super().__init__()
+        self._device = device
+        self._batch_size = batch_size
         self._audio_model = audio_model
         self._text_model = text_model
         self._audio_pipeline = Pipeline.from_pretrained(
@@ -35,7 +38,7 @@ class LocalTranscription(BaseTranscription):
             logging.error("Could not load the speaker diarization pipeline.")
             return
         
-        if audio_model not in whisper.available_models():
+        """ if audio_model not in whisper.available_models():
             available_models = whisper.available_models()
             selected_model = ""
 
@@ -59,8 +62,68 @@ class LocalTranscription(BaseTranscription):
                 except ValueError:
                     print("Invalid input. Please try again.")
         else:
-            selected_model = audio_model
-        self._whisper_model = whisper.load_model(selected_model, device='cuda')
+            selected_model = audio_model """
+        self._whisper_model = whisper.load_model(audio_model, device='cuda')
+    
+    def transcribe_audio_v2(self, file_path, num_speakers=4) -> str:
+        
+        # save model to local path (optional)
+        # model_dir = "/path/"
+        # model = whisperx.load_model("large-v2", device, compute_type=compute_type, download_root=model_dir)
+        try:
+            audio = whisper.load_audio(file_path)
+            logging.info("Beginning transcription")
+            start_time = time.time()
+            result = self._whisper_model.transcribe(audio, batch_size=self._batch_size)
+            logging.info(f"Finished transcription - total time: {(time.time() - start_time):.3f} seconds")
+            logging.debug("Before alignment")
+            logging.debug(result["segments"]) # before alignment
+
+            # delete model if low on GPU resources
+            # import gc; gc.collect(); torch.cuda.empty_cache(); del model
+
+            # 2. Align whisper output
+            logging.info("Beginning alignment")
+            start_time = time.time()
+            model_a, metadata = whisper.load_align_model(language_code=result["language"], device=self._device)
+            result = whisper.align(result["segments"], model_a, metadata, audio, self._device, return_char_alignments=False)
+            logging.info(f"Finished alignment - total time: {(time.time() - start_time):.3f} seconds")
+            logging.debug("After alignment")
+            logging.debug(result["segments"]) # after alignment
+            
+            diarize_model = whisper.DiarizationPipeline(use_auth_token=os.getenv("HF_ACCESS_TOKEN"), device=self._device)
+
+            # add min/max number of speakers if known
+            logging.info("Beginning diarization")
+            start_time = time.time()
+            diarize_segments = diarize_model(audio, min_speakers=1, max_speakers=num_speakers)
+            logging.info(f"Finished diarization - total time: {(time.time() - start_time):.3f} seconds")
+            logging.debug(diarize_segments)
+            # diarize_model(audio, min_speakers=min_speakers, max_speakers=max_speakers)
+
+            logging.info("Assigning word speakers")
+            start_time = time.time()
+            results = whisper.assign_word_speakers(diarize_segments, result)
+            logging.info(f"Finished assigning word speakers - total time: {(time.time() - start_time):.3f} seconds")
+            logging.debug(results)
+            
+            transcription = []
+            logging.info("Constructing response")
+            start_time = time.time()
+            for i, entry in enumerate(results['segments']):
+                logging.debug(f"Segment {i}: {entry}")
+                if 'speaker' in entry.keys():
+                    transcription.append(entry['speaker'] + ": " + entry['text'])
+                else:
+                    transcription.append("Unknown speaker: " + entry['text'])
+                    
+            logging.info(f"Done constructing response - total time: {(time.time() - start_time):.3f} seconds")
+            
+            logging.debug(f"Returning from transcribe_audio_v2 - transcription is below:\n\n{transcription}")
+            return '\n'.join(statement for statement in transcription)
+        except Exception as e:
+            logging.error(e)
+            return "Could not transcribe audio. Please try again."
         
     def transcribe_audio(self, file_path) -> str:
         """
@@ -135,12 +198,12 @@ class LocalTranscription(BaseTranscription):
                 # return type:  Iterator[Union[Tuple[Segment, TrackName], Tuple[Segment, TrackName, Label]]]
                 for i, track_data in enumerate(diarization.itertracks(yield_label=True)):
                     for i, datum in enumerate(track_data):
-                        logging.info(f"Speaker[{i}]: {datum}")
+                        logging.debug(f"Speaker[{i}]: {datum}")
 
                     start = track_data[0].start
                     end = track_data[0].end
                     speaker_id = track_data[2]
-                    logging.info(f"Speaker: {speaker_id} - Start: {start} - End: {end}")
+                    logging.debug(f"Speaker: {speaker_id} - Start: {start} - End: {end}")
                     groups[speaker_id].append({"start":start, "end": end})
         
                 logging.info(f"Writing speaker diarization info to {diarization_json}")
@@ -191,7 +254,8 @@ class LocalTranscription(BaseTranscription):
             start_time = time.time()
             audio_data = whisper.load_audio(tmpfile)
             segment_transcription = self._whisper_model.transcribe(
-                audio_data)
+                audio_data, batch_size=self._batch_size)
+                
             logging.info(f"Done transcribing audio {tmpfile}. Time to transcribe: {(time.time() - start_time):.3f}")
             transcription.append(f"Speaker {speaker_dict[gidx]}: {segment_transcription['text']}")
             gidx +=1
@@ -246,14 +310,21 @@ Any responses that you give should be based on the information in the transcript
             responses = ollama.chat(
                 messages=self.chat_responses,
                 model=self._text_model,
-                stream = True)
+                stream = True,
+                options={"num_ctx": 4096,
+                         "temperature": 0.85,
+                         "num_predict":-1 }
+                )
+            response_num = 0
             for response in responses:
                 if not response['done']:
                     self.chat_responses.append({"role": "assistant",
                                                 "content": response['message']['content']})
                     answer+=response['message']['content']
+                    response_num +=1
                 else:
                     break
+            logging.info(f"Received {response_num} responses from ollama")
             logging.debug(f"Response from ollama: {answer}")
             return answer
         

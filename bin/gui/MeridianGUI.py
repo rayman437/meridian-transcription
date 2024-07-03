@@ -292,7 +292,6 @@ class MeridianGUI(tk.Tk):
 
     def transcribe_session(self):
         # Code to be executed when "Transcribe Session" button is pressed
-        transcription = None
         
         self.buttons["transcribe_button"].config(state=tk.DISABLED)
 
@@ -300,7 +299,7 @@ class MeridianGUI(tk.Tk):
         transcription_title = "Ready to transcribe"
         transcription_window = tk.Toplevel(self)
         transcription_window.title(transcription_title)
-        transcription_window.geometry("500x500")
+        transcription_window.resizable(True, True)
         
         # Create a frame inside the window
         frame = tk.Frame(transcription_window)
@@ -323,28 +322,41 @@ class MeridianGUI(tk.Tk):
         def exit_transcription():
             self.buttons["transcribe_button"].config(state=tk.NORMAL)
             transcription_window.destroy()
-            
-        def do_transcription():
-                    # Ask the user for the transcription file
+        
+        # Function to validate the input value
+        def validate_num_speakers() -> int:
+      
+            num_speakers = int(num_speakers_entry.get())
+            if num_speakers < 1 or num_speakers > 8:
+                raise ValueError(f"Number of Speakers must be an integer between 1 and 8. Value provided: {num_speakers}")
+            return num_speakers
+
+        def do_transcription(num_speakers:int=None):
+    
             while True:
+                # Ask the user for the transcription file
+
                 file_path = filedialog.askopenfilename(filetypes=(('Audio Files', '*.flac;*.m4a;*.mp3;*.mp4;*.mpeg;*.mpga;*.oga;*.ogg;*.wav;*.webm'), ('All Files', '*.*')), parent=transcription_window)
                 if file_path:
                     try:
+                        num_speakers = validate_num_speakers()
                         # Display an info message warning that transcription will take a while
                         transcription_window.title("Transcribing.....")
                         messagebox.showinfo("Transcription", "Program may hang while transcription is going on - this is normal. Please be patient...")
                         textbox.delete("1.0", tk.END)
                         start_time = time.time()
-                        transcription = self.model.transcribe_audio(file_path)
-                        end_time = time.time()
-
-                        # Calculate the duration of the transcription
-                        duration = end_time - start_time
-
+                        logging.info("GUI: Calling transcribe_audio function")
+                        transcription = self.model.transcribe_audio(file_path, num_speakers)
+                        logging.info(f"GUI: Transcription completed after {time.time() - start_time} seconds")
+        
                         # Display a notification with the transcription duration
-                        messagebox.showinfo("Transcription", f"Transcription completed in {duration} seconds.")
                         transcription_window.title(transcription_title)
-                        textbox.insert(tk.END, transcription)
+                        if transcription is not None:
+                            messagebox.showinfo("Transcription Complete", f"Transcription completed in {time.time() - start_time} seconds.")
+                            textbox.insert(tk.END, transcription)
+                        else:
+                            messagebox.showerror("Transcription Error", "An error occurred during transcription.")
+                            
 
                         break
                     except Exception as e:
@@ -356,10 +368,16 @@ class MeridianGUI(tk.Tk):
                     logging.info(f"Failed transcription: user response = {answer}")
                     if answer == 'cancel':
                         break
-                
+   
         transcription_button = tk.Button(frame, text="Transcribe Audio", command= do_transcription)
         transcription_button.pack(side=tk.LEFT, padx=10, pady=10)
-            
+        
+        # Create an input box for Number of Speakers
+        num_speakers_label = tk.Label(frame, text="Number of Speakers:")
+        num_speakers_label.pack(side=tk.LEFT, padx=10, pady=10)
+        num_speakers_entry = tk.Entry(frame)
+        num_speakers_entry.pack(side=tk.LEFT, padx=10, pady=10)
+           
         save_button = tk.Button(frame, text="Save", command= save_transcription)
         save_button.pack(side=tk.LEFT, padx=10, pady=10)
         
@@ -368,9 +386,6 @@ class MeridianGUI(tk.Tk):
 
         exit_button = tk.Button(frame, text="Exit", command=  exit_transcription)
         exit_button.pack(side=tk.LEFT, padx=10, pady=10)
-        
-        # Make the window resizable
-        transcription_window.resizable(True, True)
                         
             
     def save_session(self):
