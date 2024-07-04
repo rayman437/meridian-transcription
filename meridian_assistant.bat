@@ -1,0 +1,1 @@
+python .\meridian_assistant.py

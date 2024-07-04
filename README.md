@@ -13,7 +13,11 @@ Meridian Assistant is a versatile tool designed for transcribing audio files and
 
 To launch the GUI (default usage mode), just launch the following script
 
-python meridian_assistant.py 
+./meridian_assistant.py 
+
+For windows users, start the following batch file to invoke the program:
+
+.\meridian_assistant.bat
 
 ## Installation
 
