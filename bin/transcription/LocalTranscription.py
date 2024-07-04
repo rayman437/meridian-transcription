@@ -1,17 +1,13 @@
 import logging
 import time
 import whisperx as whisper
-import gc
 import ollama
 import json
 import torch
 import os
-import re
-
 from bin.transcription.BaseTranscription import BaseTranscription
 from pydub import AudioSegment
 from pyannote.audio import Pipeline
-from pyannote.core import Segment
 
 class LocalTranscription(BaseTranscription):
     """
@@ -74,7 +70,12 @@ class LocalTranscription(BaseTranscription):
             audio = whisper.load_audio(file_path)
             logging.info("Beginning transcription")
             start_time = time.time()
-            result = self._whisper_model.transcribe(audio, batch_size=self._batch_size)
+            result = self._whisper_model.transcribe(
+                audio,
+                batch_size=self._batch_size,
+                print_progress=True,
+                )
+            
             logging.info(f"Finished transcription - total time: {(time.time() - start_time):.3f} seconds")
             logging.debug("Before alignment")
             logging.debug(result["segments"]) # before alignment
@@ -85,8 +86,19 @@ class LocalTranscription(BaseTranscription):
             # 2. Align whisper output
             logging.info("Beginning alignment")
             start_time = time.time()
-            model_a, metadata = whisper.load_align_model(language_code=result["language"], device=self._device)
-            result = whisper.align(result["segments"], model_a, metadata, audio, self._device, return_char_alignments=False)
+            
+            model_a, metadata = whisper.load_align_model(
+                language_code=result["language"],
+                device=self._device)
+            
+            result = whisper.align(result["segments"],
+                model_a,
+                metadata,
+                audio,
+                self._device,
+                return_char_alignments=False,
+                print_progress=True)
+            
             logging.info(f"Finished alignment - total time: {(time.time() - start_time):.3f} seconds")
             logging.debug("After alignment")
             logging.debug(result["segments"]) # after alignment
@@ -96,14 +108,19 @@ class LocalTranscription(BaseTranscription):
             # add min/max number of speakers if known
             logging.info("Beginning diarization")
             start_time = time.time()
-            diarize_segments = diarize_model(audio, min_speakers=1, max_speakers=num_speakers)
+            diarize_segments = diarize_model(
+                audio,
+                min_speakers=1,
+                max_speakers=num_speakers)
             logging.info(f"Finished diarization - total time: {(time.time() - start_time):.3f} seconds")
             logging.debug(diarize_segments)
             # diarize_model(audio, min_speakers=min_speakers, max_speakers=max_speakers)
 
             logging.info("Assigning word speakers")
             start_time = time.time()
-            results = whisper.assign_word_speakers(diarize_segments, result)
+            results = whisper.assign_word_speakers(
+                diarize_segments,
+                result)
             logging.info(f"Finished assigning word speakers - total time: {(time.time() - start_time):.3f} seconds")
             logging.debug(results)
             
@@ -221,8 +238,8 @@ class LocalTranscription(BaseTranscription):
         filenames = [] 
         
         if not os.path.exists(os.path.curdir + r'\tmp'):
-            logging.info(f"Making temporary directory for audio files: {os.path.curdir + r'\tmp'}")
-            os.makedirs(os.path.curdir + r'\tmp')
+            logging.info(f"Making temporary directory for audio files: {os.path.curdir} \\tmp")
+            os.makedirs(os.path.curdir + '\\tmp')
             logging.info(f"Done making temporary directory for audio files")
 
             
