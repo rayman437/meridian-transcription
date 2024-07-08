@@ -8,13 +8,14 @@ import os
 from bin.transcription.BaseTranscription import BaseTranscription
 from pydub import AudioSegment
 from pyannote.audio import Pipeline
+import torch
 
 class LocalTranscription(BaseTranscription):
     """
     Class for local audio transcription.
     """
 
-    def __init__(self, audio_model = 'medium.en', text_model = 'llama3', device = 'cuda', batch_size = 16):
+    def __init__(self, audio_model = 'medium.en', text_model = 'llama3', batch_size = 16):
         """
         Initializes a new instance of the LocalTranscription class.
         
@@ -22,47 +23,44 @@ class LocalTranscription(BaseTranscription):
         It prompts the user to select a whisper model from the available models list and loads the selected model.
         """
         super().__init__()
-        self._device = device
+        self._device = "cuda"
+        self._audio_model = "medium.en"
         self._batch_size = batch_size
         self._audio_model = audio_model
         self._text_model = text_model
-        self._audio_pipeline = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            use_auth_token=os.getenv('HF_ACCESS_TOKEN')).to(torch.device("cuda"))
+        self._compute_type = "float16"
+        self._whisper_model = None
+        self.load_ollama_model()
 
-        if self._audio_pipeline is None:
-            logging.error("Could not load the speaker diarization pipeline.")
-            return
-        
-        """ if audio_model not in whisper.available_models():
-            available_models = whisper.available_models()
-            selected_model = ""
+    def load_ollama_model(self):
+        if not torch.cuda.is_available():
+            self._text_model = "phi3"
+        ollama.pull(self._text_model)
 
-            # Ask the user to select models from the available models list
-            print("Available models:")
-            for i, audio_model in enumerate(available_models):
-                print(f"{i+1}. {audio_model}")
+    def load_whisper_model(self):
+        """
+        Loads the whisper model for audio transcription.
+        """
+        # Default to CPU and smaller models for resources if a GPU is not present
+        if not torch.cuda.is_available():
+            self._device = 'cpu'
+            self._compute_type = "int8"
+            self._audio_model = "small.en"
 
-            while True:
-                model_index = input("Select a model (enter the corresponding number) or press 'q' to quit: ")
-                if model_index == 'q':
-                    break
-                try:
-                    model_index = int(model_index)
-                    if 1 <= model_index <= len(available_models):
-                        selected_model = available_models[model_index-1]
-                        print(f"Selected model: {selected_model}")
-                        break
-                    else:
-                        print("Invalid model index. Please try again.")
-                except ValueError:
-                    print("Invalid input. Please try again.")
-        else:
-            selected_model = audio_model """
-        self._whisper_model = whisper.load_model(audio_model, device='cuda')
+        self._whisper_model = whisper.load_model(
+            whisper_arch=self._audio_model,
+            device=self._device,
+            compute_type=self._compute_type
+        )
+
+        if self._whisper_model is None:
+            raise Exception("Was not able to create local whisper model instance")
     
     def transcribe_audio_v2(self, file_path, num_speakers=4) -> str:
         
+        if self._whisper_model is None:
+            self.load_whisper_model()
+
         # save model to local path (optional)
         # model_dir = "/path/"
         # model = whisperx.load_model("large-v2", device, compute_type=compute_type, download_root=model_dir)
@@ -152,6 +150,9 @@ class LocalTranscription(BaseTranscription):
         Returns:
             str: The transcription of the audio file.
         """
+
+        if self._whisper_model is None:
+            self.load_whisper_model()
         
         def millisec(val: float ) -> int:
 

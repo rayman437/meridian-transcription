@@ -129,7 +129,6 @@ class MeridianGUI(tk.Tk):
         # Create a new window
         analyze_window = tk.Toplevel(self)
         analyze_window.title("Analyze Window")
-        analyze_window.geometry("1200x1200")
         analyze_window.resizable(True, True)
          
         # Define button functions
@@ -204,90 +203,86 @@ class MeridianGUI(tk.Tk):
                 messagebox.showinfo("Invalid File", "Please select a valid file.")
 
 
-        # Create a frame inside the window
-        frame = tk.Frame(analyze_window)
-        frame.pack(fill=tk.BOTH, expand=True)
-        
+        row = 0
+        col = 0
+        spacing_y = 2
+
         # Create a frame for the transcript textbox and scrollbar
-        transcript_frame = tk.Frame(frame)
+        transcript_frame = tk.Frame(analyze_window)
         transcript_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-        
+
         # Create a label for Transcript textbox
         transcript_label = tk.Label(transcript_frame, text="Transcript:")
-        transcript_label.pack(side=tk.TOP, padx=10, pady=10)
+        transcript_label.pack(side=tk.TOP)
         
         # Create a textbox for Transcript
-        transcript_textbox = tk.Text(transcript_frame)
+        transcript_textbox = tk.Text(transcript_frame, height=10)
         transcript_textbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         transcript_scrollbar = tk.Scrollbar(transcript_frame, command=transcript_textbox.yview)
         transcript_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         transcript_textbox.config(yscrollcommand=transcript_scrollbar.set)
+        #transcript_frame.grid(column=col, row=row, sticky=tk.W + tk.E)
+        row+=1
 
         # Create a frame for the query buttons
-        query_button_frame = tk.Frame(frame)
-        query_button_frame.pack(fill=tk.BOTH, expand=True)
+        query_button_frame = tk.Frame(analyze_window)
 
         # Create buttons
         buttons = {
-            "load_query": tk.Button(query_button_frame, text="Load Query", command=load_query),
-            "save_query": tk.Button(query_button_frame, text="Save Query", command=save_query),
-            "save_conversation": tk.Button(query_button_frame, text="Save Conversation", command=save_conversation),
-            "clear_conversation": tk.Button(query_button_frame, text="Clear Conversation", command=clear_conversation)
+            "load_query": tk.Button(query_button_frame, text="Load Query", command=load_query).pack(side=tk.LEFT, ipadx=5),
+            "save_query": tk.Button(query_button_frame, text="Save Query", command=save_query).pack(side=tk.LEFT, ipadx=5),
+            "save_conversation": tk.Button(query_button_frame, text="Save Conversation", command=save_conversation).pack(side=tk.LEFT, ipadx=5),
+            "clear_conversation": tk.Button(query_button_frame, text="Clear Conversation", command=clear_conversation).pack(side=tk.LEFT, ipadx=5)
         }
 
-        # Place buttons on the grid
-        num_buttons = len(buttons)
-        for i, button_name in enumerate(buttons):
-            button = buttons[button_name]
-            button.grid(row=0, column=i % num_buttons, padx=10)
+        #query_button_frame.grid(column=0, row=row, pady=spacing_y, sticky=tk.W + tk.E)
+        query_button_frame.pack()
+        row+=1
         
         # Create a frame for the query textbox and scrollbar
-        query_frame = tk.Frame(frame)
-        query_frame.pack(fill=tk.BOTH, expand=True)
+        query_frame = tk.Frame(analyze_window)
+        query_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        # Create a textbox for Query
-        query_textbox = tk.Text(query_frame, height=int(transcript_textbox['height']) // 2)
-        query_textbox.pack(side=tk.TOP, fill=tk.X, expand=True)
+        #query_textbox = tk.Text(query_frame, height=int(transcript_textbox['height']) // 2)
+        query_textbox = tk.Text(query_frame, height=10)
+        query_textbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         query_scrollbar = tk.Scrollbar(query_frame, command=query_textbox.yview)
         query_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         query_textbox.config(yscrollcommand=query_scrollbar.set)
         query_textbox.insert(tk.END, "Summarize the information in this session. Ignore any conversation unrelated to the role playing that is occurring during this transcript.")
         query_textbox.bind("<Return>", lambda event: submit_question())
+        #query_frame.grid(column=0, row=row, pady=spacing_y, sticky=tk.W + tk.E )
+        row+=1
 
         # Create a frame for the response textbox and scrollbar
-        response_frame = tk.Frame(frame)
-        response_frame.pack(fill=tk.BOTH, expand=True)
-
+        response_frame = tk.Frame(analyze_window)
         # Create a label for Response textbox
         response_label = tk.Label(response_frame, text="Response:")
-        response_label.pack(side=tk.TOP, padx=10, pady=5)
+        response_label.pack(side=tk.TOP)
 
         # Create a textbox for Response
-        response_textbox = tk.Text(response_frame, height=int(transcript_textbox['height']) // 2)
-        response_textbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        #response_textbox = tk.Text(response_frame, height=int(transcript_textbox['height']) // 2)
+        response_textbox = tk.Text(response_frame, height=10)
+        response_textbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         response_scrollbar = tk.Scrollbar(response_frame, command=response_textbox.yview)
         response_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         response_textbox.config(yscrollcommand=response_scrollbar.set)
+        #response_frame.grid(column=0, row=row, pady=spacing_y, sticky=tk.W + tk.E )
+        response_frame.pack(fill=tk.BOTH, side=tk.TOP, expand=True)
+        row+=1
 
         # Create a frame for the buttons
         button_frame = tk.Frame(analyze_window)
-        button_frame.pack(side=tk.BOTTOM, padx=10, pady=10)
-        
         load_transcript_button = tk.Button(button_frame, text="Load Transcript", command =load_transcript)
-        load_transcript_button.pack(side=tk.LEFT, padx=10)
-
+        load_transcript_button.pack(side=tk.LEFT, ipadx=5)        
         submit_question_button = tk.Button(button_frame, text="Submit Question", command = submit_question)
-        submit_question_button.pack(side=tk.LEFT, padx=10)
-
+        submit_question_button.pack(side=tk.LEFT, ipadx=5)
         save_response_button = tk.Button(button_frame, text="Save Response", command = save_response)
-        save_response_button.pack(side=tk.LEFT, padx=10)
-
+        save_response_button.pack(side=tk.LEFT, ipadx=5)        
         exit_button = tk.Button(button_frame, text="Exit", command= lambda : analyze_window.destroy())
-        exit_button.pack(side=tk.LEFT, padx=10)
-
-        # Make the window resizable
-        analyze_window.pack_slaves()
-
+        exit_button.pack(side=tk.LEFT, ipadx=5)
+        #button_frame.grid(column=0, row=row, pady=spacing_y, sticky=tk.W + tk.E )
+        button_frame.pack()
 
 
     def transcribe_session(self):
