@@ -2,6 +2,7 @@
 
 import tkinter as tk
 from tkinter import messagebox, filedialog
+from bin.controller.MeridianController import MeridianController
 from bin.model.MeridianModel import MeridianModel
 from dotenv import load_dotenv
 from PIL import Image, ImageTk
@@ -15,8 +16,21 @@ class MeridianGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Meridian GUI")
-        self.geometry("")
 
+        # Ask the user if they'd like to use local or remote transcription
+        transcription_choice = messagebox.askyesno("Transcription Choice", "Would you like to use local transcription?", parent=self)
+        service = ""
+        if transcription_choice:
+            # Code for local transcription
+            service = "local"
+        else:
+            # Code for remote transcription
+            service = "remote"
+            
+        self.controller = MeridianController(transcription_service=service)
+        self.model = None
+        
+        self.geometry("")
         # Randomly pick an image
         # Get the path to the bin folder
         bin_folder = os.path.join(os.getcwd(), "bin/splash_images")
@@ -70,7 +84,6 @@ class MeridianGUI(tk.Tk):
 
         self.lock_buttons()
         self.set_topmost(self, True)
-        self.model = MeridianModel(transcription_service="local")
 
         # Ask the user if they'd like to load a previous campaign
         self.attributes("-topmost", True)
@@ -80,7 +93,7 @@ class MeridianGUI(tk.Tk):
             # Open a file dialog for the user to select a file
             file_path = filedialog.askopenfilename(filetypes=(('CSV Files', '*.csv'), ('All Files', '*.*')))
             if file_path:
-                self.model.load_campaign(file_path)
+                self.get_controller().load_campaign(file_path)
             else:
                 messagebox.showinfo("Invalid File", "Please select a valid file.")
          
@@ -90,7 +103,10 @@ class MeridianGUI(tk.Tk):
         # Continue with execution
  
         self.mainloop()
-        
+    
+    
+    def get_controller(self) -> MeridianController:
+        return self.controller                
 
     def set_topmost(self, window:tk.Tk, boolean_arg=True):
         if window is None:
@@ -112,7 +128,7 @@ class MeridianGUI(tk.Tk):
         summary = None
         if file_path:
             try:
-                summary = self.model.summarize_audio(file_path)
+                summary = self.get_controller().summarize_session(file_path)
             except Exception as e:
                 messagebox.showerror("Error", f"An error occurred: {e}")
                 logging.error(e)
@@ -147,8 +163,9 @@ class MeridianGUI(tk.Tk):
             submit_question_button.config(state=tk.DISABLED)
             try:
                 question = query_textbox.get("1.0", tk.END).strip()
-                if question:
-                    response = self.model.ask_question(question, transcript_textbox.get("1.0", tk.END).strip())
+                transcript = transcript_textbox.get("1.0", tk.END).strip()
+                if question and transcript:
+                    response = self.get_controller().ask_question(question, transcript)
                     response_textbox.delete("1.0", tk.END)
                     response_textbox.insert(tk.END, response)
                 else:
@@ -161,36 +178,32 @@ class MeridianGUI(tk.Tk):
             logging.info("submit_question function exit")
 
         def save_response():
-            # Code to be executed when "Save Response" button is pressed
+            logging.info("save_response function called")
             file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
             if file_path:
-                with open(file_path, 'w') as file:
-                    file.write(response_textbox.get("1.0", tk.END))
+                self.get_controller().save_data(file_path, response_textbox.get("1.0", tk.END))
             else:
                 messagebox.showinfo("Invalid File", "Please select a valid file.")
-            logging.info("save_response function called")
+
         
         def load_query():
+            logging.info("load_query function called")
             file_path = filedialog.askopenfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')), parent=analyze_window)
             if file_path:
-                with open(file_path, 'r') as file:
-                    content = file.read()
-                    query_textbox.delete("1.0", tk.END)
-                    query_textbox.insert(tk.END, content)
-            logging.info("load_query function called")
+                query_textbox.delete("1.0", tk.END)
+                query_textbox.insert(tk.END, self.get_controller().load_data(file_path))    
 
         def save_query():
+            logging.info("save_query function called")
             file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
             if file_path:
-                with open(file_path, 'w') as file:
-                    file.write(query_textbox.get("1.0", tk.END))
+                self.get_controller().save_data(file_path, query_textbox.get("1.0", tk.END))
             else:
                 messagebox.showinfo("Invalid File", "Please select a valid file.")
-            logging.info("save_query function called")
         
         def clear_conversation():
             logging.info("Clearing conversation")
-            self.model.clear_conversation()
+            self.get_controller().clear_conversation()
             response_textbox.delete("1.0", tk.END)
             
         def save_conversation():
@@ -198,7 +211,7 @@ class MeridianGUI(tk.Tk):
             file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
             logging.info(f"Saving conversation to file {file_path}")
             if file_path:
-                self.model.save_conversation(file_path)
+                self.get_controller().save_conversation(file_path)
             else:
                 messagebox.showinfo("Invalid File", "Please select a valid file.")
 
@@ -305,14 +318,12 @@ class MeridianGUI(tk.Tk):
         textbox.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         
         def save_transcription():
-            self.model.save_session(textbox.get("1.0", tk.END))
+            self.get_controller().save_session(textbox.get("1.0", tk.END))
         
         def write_transcription():
             file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
             if file_path:
-                with open(file_path, 'w') as file:
-                    transcription = textbox.get("1.0", tk.END)
-                    file.write(transcription)
+                self.get_controller().save_data(file_path, textbox.get("1.0", tk.END))  
                     
         def exit_transcription():
             self.buttons["transcribe_button"].config(state=tk.NORMAL)
@@ -341,7 +352,7 @@ class MeridianGUI(tk.Tk):
                         textbox.delete("1.0", tk.END)
                         start_time = time.time()
                         logging.info("GUI: Calling transcribe_audio function")
-                        transcription = self.model.transcribe_audio(file_path, num_speakers)
+                        transcription = self.get_controller().transcribe_audio(file_path, num_speakers)
                         logging.info(f"GUI: Transcription completed after {time.time() - start_time} seconds")
         
                         # Display a notification with the transcription duration
@@ -386,20 +397,20 @@ class MeridianGUI(tk.Tk):
     def save_session(self):
         # Code to be executed when "Save" button is pressed
         
-        file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
-        if file_path:
-            if os.path.exists(file_path):
+        directory_path = filedialog.askdirectory(initialdir='./data')
+        if directory_path:
+            if os.path.exists(directory_path):
                 confirm = messagebox.askyesno("File Exists", "The file already exists. Do you want to overwrite it?")
                 if confirm:
-                    self.model.save_session(file_path)
-                    messagebox.showinfo("Saved", "Response saved successfully.")
+                    self.get_controller().save_session(directory_path)
+                    messagebox.showinfo("Saved", "Session saved successfully.")
                     return True
                 else:
-                    messagebox.showinfo("Not Saved", "Response not saved.")
+                    messagebox.showinfo("Not Saved", "Session not saved.")
                     return None
             else:
-                self.model.save_session(file_path)
-                messagebox.showinfo("Saved", "Response saved successfully.")
+                self.get_controller().save_session(directory_path)
+                messagebox.showinfo("Saved", "Session saved successfully.")
                 return True
         else:
             messagebox.showinfo("Invalid File", "Please select a valid file.") 
@@ -421,12 +432,12 @@ class MeridianGUI(tk.Tk):
     def load_data(self):
         file_path = filedialog.askopenfilename(filetypes=(('CSV Files', '*.csv'), ('All Files', '*.*')))
         if file_path:
-            self.model.load_campaign(file_path)
+            self.get_controller().load_campaign(file_path)
         else:
             messagebox.showinfo("Invalid File", "Please select a valid file.")
     
     def view_data(self):
-        campaign_info = self.model.get_campaign_info()
+        campaign_info = self.get_controller().get_campaign_info()
         
         if len(campaign_info) == 0:
             messagebox.showinfo("No Data", "There is no data to display.")
@@ -519,7 +530,7 @@ class MeridianGUI(tk.Tk):
             # Insert the content into the text widget
             text_widget.insert(tk.END, content)
                 
-            save_to_campaign_button = tk.Button(summary_window, text="Save to Campaign", command= lambda: self.model.save_to_campaign(content) )
+            save_to_campaign_button = tk.Button(summary_window, text="Save to Campaign", command= lambda: self.get_controller().save_to_campaign(content) )
             save_to_campaign_button.pack(side=tk.LEFT, padx=10, pady=10)
 
             exit_transcript_button = tk.Button(summary_window, text="Exit", command=summary_window.destroy)

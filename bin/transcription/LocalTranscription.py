@@ -15,7 +15,12 @@ class LocalTranscription(BaseTranscription):
     Class for local audio transcription.
     """
 
-    def __init__(self, audio_model = 'medium.en', text_model = 'llama3', batch_size = 16):
+    def __init__(self,
+                 audio_model = 'small.en',
+                 text_model = 'llama3',
+                 batch_size = 16,
+                 compute_type = "float16",
+                 device="cuda"):
         """
         Initializes a new instance of the LocalTranscription class.
         
@@ -23,12 +28,12 @@ class LocalTranscription(BaseTranscription):
         It prompts the user to select a whisper model from the available models list and loads the selected model.
         """
         super().__init__()
-        self._device = "cuda"
-        self._audio_model = "medium.en"
+        self._device = device
+        self._audio_model = audio_model
         self._batch_size = batch_size
         self._audio_model = audio_model
         self._text_model = text_model
-        self._compute_type = "float16"
+        self._compute_type = compute_type
         self._whisper_model = None
         self.load_ollama_model()
 
@@ -283,7 +288,7 @@ class LocalTranscription(BaseTranscription):
         return "\n".join(transcription)
         
 
-    def summarize_text(self, transcription) -> str:
+    def summarize_text(self, transcription, num_lines = 20, levels = 2, granularity=2) -> str:
         """
         Summarizes the transcription of a session.
 
@@ -293,16 +298,56 @@ class LocalTranscription(BaseTranscription):
         Returns:
             str: The summarized version of the transcription.
         """
+        num_summarizations = 0
+        # Break the text up into smaller chunks to increase the ability for the LLM to extract data
+        def summarize_chunk(chunk, num_summarizations):
+            
+            prompt = f"Summarize the following text:\n {chunk}"
+            try:
+                logging.info("Summarizing chunk %0d with prompt: %s", num_summarizations, prompt)
+                response = ollama.generate(model=self._text_model, prompt=prompt, system="You are an assistant trying to help summarize a text", stream=False)
+                logging.info("Response from ollama for chunk %0d: %s", num_summarizations, response['response'])
+                num_summarizations+=1
+                return response['response']
+            except Exception as e:
+                logging.error(e)
+                return None
+            
+        def consolidate_chunks(responses, num_summarizations):
+            consolidated = ""
+            for response in responses:
+                consolidated += response + "\n"
+            
+            return summarize_chunk(consolidated, num_summarizations)
         
-        transcription_req = f"Summarize the following transcription of a Dungeons and Dragons campagin session: \n\n{transcription}"
-        logging.info(f"Sending query to ollama for summarization using following message:\n {transcription_req}")
-        try:
-            response = ollama.generate(model=self._text_model, prompt=transcription_req)
-            logging.info(f"Response from ollama: {response}")
-            return response['response']
-        except Exception as e:
-            logging.error(e)
-            return None
+        responses = []
+        chunks = []
+        transcription_lines = transcription.split("\n")
+        for i in range(0, len(transcription_lines), num_lines):
+            lines = "\n".join(transcription_lines[i:i+num_lines])
+            logging.info("Summarizing lines %0d to %0d", i, i+num_lines)
+            chunk = summarize_chunk(lines, num_summarizations)
+            chunks.append(chunk)
+        
+        logging.info("Summarizing chunks")
+        for i in range(0, levels):
+            logging.info("Summarizing level %0d",i+1)
+            for i in range(0, len(chunks), granularity):
+                logging.info("Summarizing chunk %0d to %0d", i, i+granularity)
+                try:
+                    response = consolidate_chunks(chunk[i:i+granularity], num_summarizations)
+                    logging.info("Consolidated response: %s", {response})
+                    responses.append(response)
+                except Exception as e:
+                    logging.error(e)
+                    return None
+            logging.info(f"Finished summarizing level {i+1} - resizing chunks ({len(chunks)}) to {len(responses)}")
+            logging.info(f"Responses: {responses}")
+            chunks = responses
+        logging.info("Returning consolidated %0d responses: %s", num_summarizations, "\n".join(chunks) )
+        return "\n".join(chunks)
+        
+        s
         
     def ask_question(self, question, source_info) -> str:
         answer = ""
@@ -324,7 +369,7 @@ Any responses that you give should be based on the information in the transcript
         logging.debug(f"Current responses:\n\n {self.chat_responses}")
         
         try:
-            logging.info(f"Attempting to send query to ollama for question analysis: {question}")
+            logging.info(f"Attempting to send query to ollama for question analysis: {self.chat_responses}")
             responses = ollama.chat(
                 messages=self.chat_responses,
                 model=self._text_model,
@@ -349,4 +394,3 @@ Any responses that you give should be based on the information in the transcript
         except Exception as e:
             logging.error(e)
             return "Query failed - please try again."
-    
