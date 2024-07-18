@@ -45,10 +45,10 @@ class MeridianController:
             result = self.agent.summarize_text(contents)
         return result
     
-    def ask_question(self, question, source_info):
+    def ask_question(self, question, source_info, num_ctx = 4096):
         logging.info("ask_question function called with question: %s, source_info: %s", question, source_info)
         # Add your code to ask a question here
-        response = self.agent.ask_question(question, source_info)
+        response = self.agent.ask_question(question, source_info, num_ctx)
         logging.info("Response: %s", response)
         self.responses.append(response)
         

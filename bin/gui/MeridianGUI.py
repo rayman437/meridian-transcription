@@ -3,7 +3,7 @@
 import tkinter as tk
 from tkinter import messagebox, filedialog
 from bin.controller.MeridianController import MeridianController
-from bin.model.MeridianModel import MeridianModel
+from bin.gui.MeridianAnalyzeGUI import MeridianAnalyzeGUI
 from dotenv import load_dotenv
 from PIL import Image, ImageTk
 import os
@@ -143,160 +143,9 @@ class MeridianGUI(tk.Tk):
             
     def analyze_session(self):
         # Create a new window
-        analyze_window = tk.Toplevel(self)
-        analyze_window.title("Analyze Window")
-        analyze_window.resizable(True, True)
-         
-        # Define button functions
-        def load_transcript():
-            file_path = filedialog.askopenfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')), parent=analyze_window)
-            if file_path:
-                with open(file_path, 'r') as file:
-                    content = file.read()
-                    transcript_textbox.delete("1.0", tk.END)
-                    transcript_textbox.insert(tk.END, content)
-            logging.info(f"load_transcript function called for file {file_path}")
-
-        def submit_question():
-            # Code to be executed when "Submit Question" button is pressed
-            logging.info("submit_question function called")
-            submit_question_button.config(state=tk.DISABLED)
-            try:
-                question = query_textbox.get("1.0", tk.END).strip()
-                transcript = transcript_textbox.get("1.0", tk.END).strip()
-                if question and transcript:
-                    response = self.get_controller().ask_question(question, transcript)
-                    response_textbox.delete("1.0", tk.END)
-                    response_textbox.insert(tk.END, response)
-                else:
-                    messagebox.showinfo("Invalid Question", "Please enter a valid question.")
-            except Exception as e:
-                messagebox.showerror("Error", f"An error occurred: {e}")
-                logging.error(e)
-                
-            submit_question_button.config(state=tk.NORMAL)
-            logging.info("submit_question function exit")
-
-        def save_response():
-            logging.info("save_response function called")
-            file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
-            if file_path:
-                self.get_controller().save_data(file_path, response_textbox.get("1.0", tk.END))
-            else:
-                messagebox.showinfo("Invalid File", "Please select a valid file.")
-
-        
-        def load_query():
-            logging.info("load_query function called")
-            file_path = filedialog.askopenfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')), parent=analyze_window)
-            if file_path:
-                query_textbox.delete("1.0", tk.END)
-                query_textbox.insert(tk.END, self.get_controller().load_data(file_path))    
-
-        def save_query():
-            logging.info("save_query function called")
-            file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
-            if file_path:
-                self.get_controller().save_data(file_path, query_textbox.get("1.0", tk.END))
-            else:
-                messagebox.showinfo("Invalid File", "Please select a valid file.")
-        
-        def clear_conversation():
-            logging.info("Clearing conversation")
-            self.get_controller().clear_conversation()
-            response_textbox.delete("1.0", tk.END)
-            
-        def save_conversation():
-            # Code to be executed when "Save Conversation" button is pressed
-            file_path = filedialog.asksaveasfilename(filetypes=(('Text Files', '*.txt'), ('All Files', '*.*')))
-            logging.info(f"Saving conversation to file {file_path}")
-            if file_path:
-                self.get_controller().save_conversation(file_path)
-            else:
-                messagebox.showinfo("Invalid File", "Please select a valid file.")
-
-
-        row = 0
-        col = 0
-        spacing_y = 2
-
-        # Create a frame for the transcript textbox and scrollbar
-        transcript_frame = tk.Frame(analyze_window)
-        transcript_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-
-        # Create a label for Transcript textbox
-        transcript_label = tk.Label(transcript_frame, text="Transcript:")
-        transcript_label.pack(side=tk.TOP)
-        
-        # Create a textbox for Transcript
-        transcript_textbox = tk.Text(transcript_frame, height=10)
-        transcript_textbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        transcript_scrollbar = tk.Scrollbar(transcript_frame, command=transcript_textbox.yview)
-        transcript_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        transcript_textbox.config(yscrollcommand=transcript_scrollbar.set)
-        #transcript_frame.grid(column=col, row=row, sticky=tk.W + tk.E)
-        row+=1
-
-        # Create a frame for the query buttons
-        query_button_frame = tk.Frame(analyze_window)
-
-        # Create buttons
-        buttons = {
-            "load_query": tk.Button(query_button_frame, text="Load Query", command=load_query).pack(side=tk.LEFT, ipadx=5),
-            "save_query": tk.Button(query_button_frame, text="Save Query", command=save_query).pack(side=tk.LEFT, ipadx=5),
-            "save_conversation": tk.Button(query_button_frame, text="Save Conversation", command=save_conversation).pack(side=tk.LEFT, ipadx=5),
-            "clear_conversation": tk.Button(query_button_frame, text="Clear Conversation", command=clear_conversation).pack(side=tk.LEFT, ipadx=5)
-        }
-
-        #query_button_frame.grid(column=0, row=row, pady=spacing_y, sticky=tk.W + tk.E)
-        query_button_frame.pack()
-        row+=1
-        
-        # Create a frame for the query textbox and scrollbar
-        query_frame = tk.Frame(analyze_window)
-        query_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-
-        #query_textbox = tk.Text(query_frame, height=int(transcript_textbox['height']) // 2)
-        query_textbox = tk.Text(query_frame, height=10)
-        query_textbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        query_scrollbar = tk.Scrollbar(query_frame, command=query_textbox.yview)
-        query_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        query_textbox.config(yscrollcommand=query_scrollbar.set)
-        query_textbox.insert(tk.END, "Summarize the information in this session. Ignore any conversation unrelated to the role playing that is occurring during this transcript.")
-        query_textbox.bind("<Return>", lambda event: submit_question())
-        #query_frame.grid(column=0, row=row, pady=spacing_y, sticky=tk.W + tk.E )
-        row+=1
-
-        # Create a frame for the response textbox and scrollbar
-        response_frame = tk.Frame(analyze_window)
-        # Create a label for Response textbox
-        response_label = tk.Label(response_frame, text="Response:")
-        response_label.pack(side=tk.TOP)
-
-        # Create a textbox for Response
-        #response_textbox = tk.Text(response_frame, height=int(transcript_textbox['height']) // 2)
-        response_textbox = tk.Text(response_frame, height=10)
-        response_textbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        response_scrollbar = tk.Scrollbar(response_frame, command=response_textbox.yview)
-        response_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        response_textbox.config(yscrollcommand=response_scrollbar.set)
-        #response_frame.grid(column=0, row=row, pady=spacing_y, sticky=tk.W + tk.E )
-        response_frame.pack(fill=tk.BOTH, side=tk.TOP, expand=True)
-        row+=1
-
-        # Create a frame for the buttons
-        button_frame = tk.Frame(analyze_window)
-        load_transcript_button = tk.Button(button_frame, text="Load Transcript", command =load_transcript)
-        load_transcript_button.pack(side=tk.LEFT, ipadx=5)        
-        submit_question_button = tk.Button(button_frame, text="Submit Question", command = submit_question)
-        submit_question_button.pack(side=tk.LEFT, ipadx=5)
-        save_response_button = tk.Button(button_frame, text="Save Response", command = save_response)
-        save_response_button.pack(side=tk.LEFT, ipadx=5)        
-        exit_button = tk.Button(button_frame, text="Exit", command= lambda : analyze_window.destroy())
-        exit_button.pack(side=tk.LEFT, ipadx=5)
-        #button_frame.grid(column=0, row=row, pady=spacing_y, sticky=tk.W + tk.E )
-        button_frame.pack()
-
+        analyze_window = MeridianAnalyzeGUI(parent=self, controller=self.get_controller())
+        analyze_window.mainloop()
+       
 
     def transcribe_session(self):
         # Code to be executed when "Transcribe Session" button is pressed

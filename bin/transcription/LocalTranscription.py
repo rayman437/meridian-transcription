@@ -16,7 +16,7 @@ class LocalTranscription(BaseTranscription):
     """
 
     def __init__(self,
-                 audio_model = 'small.en',
+                 audio_model = 'medium.en',
                  text_model = 'llama3',
                  batch_size = 16,
                  compute_type = "float16",
@@ -347,26 +347,33 @@ class LocalTranscription(BaseTranscription):
         logging.info("Returning consolidated %0d responses: %s", num_summarizations, "\n".join(chunks) )
         return "\n".join(chunks)
         
-        s
-        
-    def ask_question(self, question, source_info) -> str:
+    def ask_question(self, question, source_info, num_ctx : int = 4096) -> str:
         answer = ""
         if self.chat_responses is None:
             logging.info("Chat responses cleared - reinitializing with contents of transcription window.")
-            self.chat_responses = [{"role" : "assistant", 
-                                "content" : "You're helping to answer a question about a Dungeons & Dragons campaign."},
-                                {"role" : "system",
-                                "content" : f'''Please provide a detailed response based on the information in this transcript
+            self.chat_responses = [{"role" : "system", "content" :"""
+You are a helpful assistant trying to help the user understand the written transcript. 
+Human conversation can wind from place to place, so take care in how information is understood.
+The different speakers are notified by their names, and the text is a transcription of a conversation.
+Specifically, analyze each sentence in order to understand and extract the events ocurring. 
+Consider the context of the conversation and the information that has already been shared so far when considering each new sentence. 
+Summarize information considering all pieces of information shared in the conversation.
+"""},
+                {"role" : "user", "content" : f'''
+You're helping to answer questions about a Dungeons & Dragons campaign. You have a text transcription of the session as your main data source, marked below. Any questions you get should be understood as being intended to extract
+information from the transcript. Use all messages from the conversation as context when constructing your answer. If you need more information, please ask for it.
                                 
-{source_info} 
-                                
-                                             
-Any responses that you give should be based on the information in the transcript and the conversation with the user. If you need more information, please ask for it.'''}]
-        
-        self.chat_responses.append({"role" : "user", "content" : question})
-        
-        logging.debug(f"Query:\n\n {question}")
-        logging.debug(f"Current responses:\n\n {self.chat_responses}")
+TRANSCRIPT:
+
+{source_info}
+
+QUESTION:
+
+{question}
+
+'''}]
+             
+        logging.info("Query:\n\n%s", question)
         
         try:
             logging.info(f"Attempting to send query to ollama for question analysis: {self.chat_responses}")
@@ -374,9 +381,12 @@ Any responses that you give should be based on the information in the transcript
                 messages=self.chat_responses,
                 model=self._text_model,
                 stream = True,
-                options={"num_ctx": 4096,
-                         "temperature": 0.85,
-                         "num_predict":-1 }
+                options={
+                    "penalize_newline": False,
+                    "repeat_last_n":-1,
+                    "num_ctx": num_ctx,
+                    
+                    }
                 )
             response_num = 0
             for response in responses:
@@ -388,7 +398,7 @@ Any responses that you give should be based on the information in the transcript
                 else:
                     break
             logging.info(f"Received {response_num} responses from ollama")
-            logging.debug(f"Response from ollama: {answer}")
+            logging.info(f"Response from ollama: {answer}")
             return answer
         
         except Exception as e:
