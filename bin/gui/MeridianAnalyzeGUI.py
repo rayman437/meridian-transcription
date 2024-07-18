@@ -124,7 +124,7 @@ class MeridianAnalyzeGUI(tk.Toplevel):
         self.submit_question_button.config(state=tk.DISABLED)
         question = self.query_textbox.get("1.0", tk.END).strip()
         transcript = self.transcript_textbox.get("1.0", tk.END).strip()
-        c = -1
+        context_size = -1
         
         if self.validate_context_size(self.context_size.get()):
             context_size = int(self.context_size.get())
